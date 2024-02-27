@@ -1,0 +1,490 @@
+import Image from "next/image";
+import { Callout, Steps } from "nextra/components";
+
+# Depth Dynamics: How to Generate Interesting Images Using 3D Models, Depth Maps and Stable Diffusion
+
+<br />
+<div style={{ display: "flex", justifyContent: "center" }}>
+  <Image
+    src="/generate-interesting-images-from-3d-models/final-sofa-images.webp"
+    width={512}
+    height={512}
+    style={{ borderRadius: "1em" }}
+    alt="A grid of four images; the result of the image generation process followed in this article."
+  />
+</div>
+
+---
+
+You may be familiar with Stable Diffusion, perhaps even having experimented with it yourself. You approach it with a particular idea in mind - after inputting a prompt and hitting generate, you anticipate a result that matches your vision. However, the reality can often be disappointing: the subject might be distorted, or even missing entirely! How can you solve this, you ask?
+
+In this tutorial, you'll learn how to use a low-poly 3D model to calculate an associated depth map, subsequently creating an accurate depiction of its real-world equivalent. From there, you can than drop it in to any scenery you can imagine!
+
+## Prerequisites
+
+It is ideal to have a decent dedicated graphics card with at least 8GB of VRAM, preferably from Nvidia - running Stable Diffusion on a lower-tier GPU or CPU will greatly hinder your image generation in terms of speed and/or compatibility.
+
+To continue with this tutorial, you must have the following software installed on your computer:
+
+- A modern web browser, like [Chrome](https://www.google.com/intl/en_us/chrome) or [Firefox](https://www.mozilla.org/en-US/firefox/new).
+- [Python 3.10.6](https://www.python.org/ftp/python/3.10.6/python-3.10.6-amd64.exe)
+- [AUTOMATIC1111 WebUI](https://github.com/AUTOMATIC1111/stable-diffusion-webui) - in this guide I use [v1.7.0](https://github.com/AUTOMATIC1111/stable-diffusion-webui/releases/tag/v1.7.0), the latest at the time of writing.
+  - `depth2img`: Stable Diffusion Model [`512-depth-ema.ckpt`](https://huggingface.co/stabilityai/stable-diffusion-2-depth/blob/main/512-depth-ema.ckpt)
+  - `inpainting`: Stable Diffusion Model [`sd-v1-5-inpainting.ckpt`](https://huggingface.co/runwayml/stable-diffusion-inpainting/blob/main/sd-v1-5-inpainting.ckpt)
+  - `rembg`: AUTOMATIC1111 Extension, found [here](https://github.com/AUTOMATIC1111/stable-diffusion-webui-rembg).
+
+Installation of these tools are explained excellently by Stable Diffusion Art [here for Windows](https://stable-diffusion-art.com/install-windows), or [here for macOS (MPS, Apple Silicon)](https://stable-diffusion-art.com/install-mac).
+
+# Process Overview
+
+To achieve reproducible and high-quality outcomes, a robust pipeline must be implemented - this roadmap provides a rough insight into said process. This, of course, will be covered more in detail throughout the course of this guide.
+
+<Steps>
+### 3D Model Rendering
+ 
+Using Three.js, we can render any 3D model (.obj) at many different camera angles.
+
+### Green Screen Image
+
+Generate an image of the object without the depth map shader applied, but instead with a "green screen," so that we can easily implant a different background using AUTOMATIC1111.
+
+### Depth Map Generation
+
+Leaving the camera in the same position, custom shaders can then be used to generate an accurate depth map of said object.
+
+### Image Generation
+
+After completion of the prior steps, Stable Diffusion can now be used to generate realistic, reproducible images. A combination of models - depth and inpainting - should be used here.
+
+</Steps>
+
+## Rendering a Low-Poly 3D Model
+
+Making use of the [Three.js](https://threejs.org) library, we can render out any .obj file into an otherwise empty scene with relative ease. I have developed a tool to make this process as simple as possible (available at [a-eye-vision.tech](https://a-eye-vision.tech)).
+
+You can bring your own model, or just use the one provided for testing. A good place to source low-poly models for free is [Poly Pizza](https://poly.pizza). To upload, simply click the "Select Model" button (shown below) at the bottom of the screen, and select your .obj file. This process is illustrated in the [following video](#video-uploading-your-own-model).
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/generate-interesting-images-from-3d-models/indicate-model-selector.webp"
+    width={1024}
+    height={1024}
+    style={{ borderRadius: "1em" }}
+    alt="An image of my browser 3D rendering tool with an arrow pointing to where a user can upload a file."
+  />
+  Couch by CMHT Oculus [CC-BY] via [Poly Pizza](https://poly.pizza/m/bw5mWRMaJsR).
+</div>
+
+## Video: Uploading Your Own Model
+
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <iframe
+    src="https://www.youtube-nocookie.com/embed/cyRuF66dTlQ"
+    width="832"
+    height="400"
+    frameborder="0"
+    allow="autoplay; encrypted-media"
+  />
+</div>
+
+Great! Now that you have your model at the ready, it's time to position the camera and render the green screen image!
+
+### Positioning the Camera
+
+On a-eye-vision.tech, the camera can move on the `x`, `y` and `z` axes - this enables the creation of many diverse images, with the subject appearing in various positions within a scene.
+
+To move on the `x` axis, simply hold down the left-click button on your mouse and drag accordingly:
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/generate-interesting-images-from-3d-models/x-axis-camera-movement.gif"
+    width={1024}
+    height={1024}
+    style={{ borderRadius: "1em" }}
+    alt="An image showing x-axis camera movement on a-eye-vision.tech's 3D model renderer."
+  />
+  Moving the camera on the x-axis is easy! Just click n' drag.
+</div>
+
+To move on the `y` axis, simply hold down the right-click button on your mouse and drag accordingly:
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/generate-interesting-images-from-3d-models/x-axis-camera-movement.gif"
+    width={1024}
+    height={1024}
+    style={{ borderRadius: "1em" }}
+    alt="An image showing y-axis camera movement on a-eye-vision.tech's 3D model renderer."
+  />
+  Moving the camera on the y-axis is easy, too. Just click n' drag - but this time,
+  on the right!
+</div>
+
+To move on the `z` axis, simply scroll up or down:
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/generate-interesting-images-from-3d-models/x-axis-camera-movement.gif"
+    width={1024}
+    height={1024}
+    style={{ borderRadius: "1em" }}
+    alt="An image showing z-axis camera movement on a-eye-vision.tech's 3D model renderer."
+  />
+  The easiest of them all - the z-axis. Just scroll as you please!
+</div>
+
+Once you're happy with the position of the camera, you can export the result by clicking the `Render Image` button at the top of the screen. This will save your green screen image to your "Downloads" folder.
+
+<Callout type="info">
+  __Please note:__ Every 3D model is different; using the same camera position
+  that I'm using with this sofa may not produce as optimal results for other
+  models. You will find this out at image generation time. Feel free to mess
+  around with many camera positions to find the best one!
+</Callout>
+
+## What is a Depth Map?
+
+To put it simply, a depth map is often a grayscale image where the darker a pixel is, the further away it is from the camera. Conversely, the lighter a pixel is, the closer it is to the screen.
+
+Examine the image provided of the Jialingjiang Bridge in Chongqing, China. It is evident that the red bridge and boat are in the foreground, followed by the traditional buildings slightly farther away, with the skyscrapers situated deeper in the background.
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/generate-interesting-images-from-3d-models/jialingjiang-bridge-color.webp"
+    width={300}
+    height={450}
+    style={{ borderRadius: "1em" }}
+    alt="An image of the Jialingjiang Bridge in Chongqing, China."
+  />
+  Photo by [Wenhao Ryan](https://unsplash.com/@wenhao_ryan?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash)
+  on [Unsplash](https://unsplash.com/photos/a-red-bridge-over-a-river-with-a-city-in-the-background-4g1wsFGABZk?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash).
+</div>
+
+To visualise this, a depth map can be used (as below). We, as humans, have the ability to naturally perceive depth - computers do not. To help them along, such an image can be generated to aid a computer model to accurately compose new derived images. Depth maps are particularly important for creating a reproducible result, as they help Stable Diffusion persist the general shape of a given object.
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/generate-interesting-images-from-3d-models/jialingjiang-bridge-depth.webp"
+    width={300}
+    height={450}
+    style={{ borderRadius: "1em" }}
+    alt="A grayscale image, portraying the depth information of the Jialingjiang Bridge and surrounding scenery in Chongqing, China."
+  />
+  Estimated depth map generated using custom script written by [thygate](https://github.com/thygate/stable-diffusion-webui-depthmap-script).
+</div>
+
+You might have noticed that the above depth map is only but an estimation of the depth information present in the image - it would not be possible to create a fully-accurate version, as the relevant data is not present. One method to generate more precise depth data is through technologies like the LiDAR sensor found on the rear of "Pro" model iPhones or similar devices. This is the technology behind the "Portrait" mode in mobile photography. Point being, this data cannot be created retroactively with absolute precision.
+
+Although MiDAS depth estimation is incredible, we can do better! This is where our 3D models and [a-eye-vision.tech](https://a-eye-vision.tech) come into action!
+
+## Generating A Depth Map
+
+At the top of web application, you will see a set of three buttons, labelled `Export JSON`, `Toggle Depth Map`, and `Render Image`. As you might guess, to see the depth map in real-time, it will need to be toggled on via the `Toggle Depth Map` button.
+
+Your screen should now look like this:
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/generate-interesting-images-from-3d-models/depth-mapping-toggled.webp"
+    width={1024}
+    height={1024}
+    style={{ borderRadius: "1em" }}
+    alt="An image showing how a-eye-vision.tech should look when live depth-mapping is enabled."
+  />
+  Default sofa/couch model in all of its depth-mapped glory!
+</div>
+
+Although subtle at this current distance, there is a noticeable difference in the level of darkness across different areas in the scene. For instance, the portion of the sofa where one would sit appears darker due to being at a greater distance from the camera, whilst the legs appear lighter, as they are closer to the camera.
+
+You can export the result by clicking the `Render Image` button at the top of the screen. This will save your depth map image to your "Downloads" folder.
+
+<Callout type="info">
+  Using this particular 3D model, I've discovered that for improved image
+  quality, it is beneficial to adjust the camera's position to include a
+  slightly larger portion of the upper area in the frame.
+</Callout>
+
+## Generating Images
+
+When utilising Stable Diffusion, it is essential to establish a structured procedure to create/maintain dependable and robust outcomes. In recent weeks, I have developed a method that generally produces reliable results, although it is not flawless and will undoubtedly need refinement. Nonetheless, it serves as a solid foundation for further work, and so achieves my current aim.
+
+<Steps>
+### Research pre-existing similar images via CivitAI, Google etc.
+ 
+Collecting a pool of both real photographs & AI-generated images (paired with their parameters) will help you formulate a prompt/negative prompt later.
+
+### Use CLIP Interrogator to get an estimated prompt.
+
+Using some of the images collected in the previous step, you can learn about the key elements of a given image/style, and use that to generate you own.
+
+### Generate a base image.
+
+For this part, ensure you are using an depth-to-image checkpoint (.ckpt) or safetensors (.safetensors) model file; I am using [`512-depth-ema.ckpt`](https://huggingface.co/stabilityai/stable-diffusion-2-depth/blob/main/512-depth-ema.ckpt) (a variant of Stable Diffusion v2).
+
+Try using the exact prompt(s) provided by CLIP Interrogator or CivitAI (or similar) at first - see what they produce. Then, try fiddling with the prompt(s) a little bit - see which has the best outcome.
+
+Select the `img2img` tab in AUTOMATIC1111, and navigate to the `Inpaint upload` sub-menu; you can upload both the green screen (top) & depth map (bottom) images, as shown below. Ensure that `Inpaint masked` is selected, as this will only change the positive space as shown by our depth map.
+
+<br />
+<div style={{ display: "flex", justifyContent: "center" }}>
+  <Image
+    src="/generate-interesting-images-from-3d-models/inpaint-upload-depth.webp"
+    width={512}
+    height={512}
+    style={{ borderRadius: "1em" }}
+    alt="An image showing how the user should operate inpaint for an image (depth map) upload in AUTOMATIC1111 img2img."
+  />
+</div>
+
+Max out the `Denoising Strength` slider, as this increases variation - a key part of this phase, as we want to modulate our textureless, low-poly, and thus low-detail 3D model into something more realistic.
+
+#### Positive Prompt
+
+```
+World of Interiors magazine cover, oak panelled wall backdrop, collection of Irish tweed cushions, matte textures, assortment of shapes and sizes, elegant masculine aesthetic, antique leather sofas, solid construction, located in an Irish residence, digital render, golden ratio, dramatic lighting, ultra realistic
+```
+
+#### Negative Prompt
+
+```
+ugly, deformed, noisy, blurry, distorted, out of focus, bad anatomy, extra limbs, poorly drawn face, poorly drawn hands, missing fingers
+```
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/generate-interesting-images-from-3d-models/green-screen-image-generation-settings.webp"
+    width={512}
+    height={512}
+    style={{ borderRadius: "1em" }}
+    alt="An image showing the settings/parameters used to generate the realistic sofa with a green screen background."
+  />
+</div>
+
+Once you have finished configuring generation settings, hit `Generate`. This is what I ended up with:
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/generate-interesting-images-from-3d-models/generated-green-screen-image.webp"
+    width={1024}
+    height={1024}
+    style={{ borderRadius: "1em" }}
+    alt="An image showing the image generated, still with green screen background, but with a filled-in sofa."
+  />
+</div>
+
+### Masking your new image for later background removal.
+
+Now that you have an image, you need to mask it so that we can target the background in the next generation. To do this, you need to have the `rembg` AUTOMATIC1111 plugin installed. Then, we want to send our current image from the `img2img` tab to the `extras` tab; this can be done by clicking the `📐` emoji underneath your image - follow the red arrow below for directions.
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/generate-interesting-images-from-3d-models/generated-green-screen-image-extras.webp"
+    width={1024}
+    height={1024}
+    style={{ borderRadius: "1em" }}
+    alt="An image showing the new generated image, still with green screen background, but with a filled-in sofa. Showing where to click to transfer image to extras tab."
+  />
+</div>
+
+Once you have clicked that, you should see that your image has been transferred to the `extras` tab.
+
+If `rembg` has been installed successfully, you will see a `Remove background` tab in the list of options. Please configure it like so, as this will return the mask required for the next step:
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/generate-interesting-images-from-3d-models/remove-background-toggle.webp"
+    width={1024}
+    height={1024}
+    style={{ borderRadius: "1em" }}
+    alt="An image showing which settings should be selected for background removal."
+  />
+</div>
+
+You should see the background is now completely black, and the subject of the image is white. This tells Stable Diffusion which parts of the image to keep as-is, and which parts to change.
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/generate-interesting-images-from-3d-models/sofa-mask.webp"
+    width={1024}
+    height={1024}
+    style={{ borderRadius: "1em" }}
+    alt="An image showing the subject of the generated image (sofa) masked out."
+  />
+</div>
+
+### Inpainting: Changing the background of the image.
+
+At this point, you will want to change image generation checkpoints to something a little more specialised. I have opted for [`sd-v1-5-inpainting.ckpt`](https://huggingface.co/runwayml/stable-diffusion-inpainting/blob/main/sd-v1-5-inpainting.ckpt), which is derived from Stable Diffusion v1.5.
+
+Return to the `Inpaint upload` sub-menu within `img2img` from earlier - replace the top image with your green screen image that has a filled-in sofa, and the bottom image (mask) with your newly-generated mask (by default, this is found in `/outputs/extras-images`).
+
+<br />
+<div style={{ display: "flex", justifyContent: "center" }}>
+  <Image
+    src="/generate-interesting-images-from-3d-models/inpaint-upload-mask.webp"
+    width={512}
+    height={512}
+    style={{ borderRadius: "1em" }}
+    alt="An image showing how the user should operate inpaint for an image (mask) upload in AUTOMATIC1111 img2img."
+  />
+</div>
+
+#### Positive Prompt
+
+```
+An oil painting of a warm and inviting living room scene, centered around a shiny leather sofa with textured cushions. The room is filled with soft, ambient lighting that casts gentle shadows and highlights on a plush carpet, a rustic wooden coffee table adorned with a vase of fresh flowers, and a crackling fireplace in the background. There are bookshelves lined with well-loved books, and a large, framed landscape painting hangs above the mantelpiece. The scene is composed with a homey yet elegant aesthetic, reminiscent of the works by the Dutch Golden Age painters, with a focus on rich textures and a harmonious color palette, cinematic composition, trending on artstation.
+```
+
+#### Negative Prompt
+
+```
+lowres, text, error, cropped, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, out of frame, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck, username, watermark, signature
+```
+
+<br />
+<div style={{ display: "flex", justifyContent: "center" }}>
+  <Image
+    src="/generate-interesting-images-from-3d-models/final-image-generation-settings.webp"
+    width={512}
+    height={512}
+    style={{ borderRadius: "1em" }}
+    alt="An image showing the settings/parameters used to generate the final image."
+  />
+</div>
+
+Once you have finished configuring generation settings, hit `Generate`. My final outcome is a collection of 4 images (also displayed at the top of the article):
+
+<br />
+<div style={{ display: "flex", justifyContent: "center" }}>
+  <Image
+    src="/generate-interesting-images-from-3d-models/final-sofa-images.webp"
+    width={512}
+    height={512}
+    style={{ borderRadius: "1em" }}
+    alt="A grid of four images; the result of the image generation process followed in this article."
+  />
+</div>
+</Steps>
+
+This workflow can be applied to many different object types, and serves as a general guide to help you create images with a consistent subject. The above instance is just a sample of what can be created!
+
+## Future Improvements
+
+To further increase the quality of these images, you could:
+
+- Implement ControlNet Depth.
+- Spend some more time fine-tuning prompts.
+- Add outlines in Paint (or similar) to help influence the shape of the background.
+
+...and of course, many more! These are outside the scope of this article at this time, but may be included in future revisions.
+
+## Conclusion
+
+In this guide, you have successfully traversed the innovative process of generating images with accurate subjects by integrating low-poly 3D models, their depth maps, and Stable Diffusion. This method enhances the fidelity of the images compared to other more 'estimative' methods, thus also providing a structured approach to generate highly-detailed and reproducible outcomes.
+
+From positioning the camera in 3D space to influence depth perception, calculating and generating depth maps, masking said depth maps on top of a green screen image, to the ultimate creation of the final image - we have demonstrated a unique approach to utilising technology for artistic endeavours.
+
+Whether your aim is to create synthetic training data (the likes of which can be seen in CAPTCHAs nowadays), or just to explore the product of creativity that can be achieved by the fusion of human ideas and Stable Diffusion's image generation capabilities - I hope this guide has provided at least a solid foundation for you to further explore the interesting field of AI art generation!
