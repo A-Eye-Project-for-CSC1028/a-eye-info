@@ -334,7 +334,7 @@ The above GLSL code reads the depth value from a depth texture (passed through a
 
 ## Image Generation Pipelines
 
-In the industry, there exist two primary GUI applications that dominate the creation of images using Stable Diffusion models: `AUTOMATIC1111` and `ComfyUI`.
+In the industry, there exist two primary GUI applications that dominate the creation of images using Stable Diffusion models: AUTOMATIC1111 and ComfyUI.
 
 During my two-month experience working on a-eye, I have explored both tools extensively and concluded that ComfyUI is the superior choice for this project. It offers a more detailed manipulation experience, allowing for the creation of more intricate images due to its wider range of adjustable settings. Moreover, ComfyUI facilitates a greater degree of automation - a feature that will be elaborated on in a [later section of this article](#automating-image-generation-pipelines).
 
@@ -586,9 +586,19 @@ These do not do anything in terms of new functionality, rather they are just ext
 
 ## Automating Image Generation Pipelines
 
-By nature, ComfyUI is meant to be interacted with with mouse and keyboard. How, then, might it be automated? My first thought was via Selenium or UIVision, as settings could easily be changed by simulating mouse clicks & keyboard inputs. I had tried the same before with `AUTOMATIC1111`, but it was buggy and time-consuming to fix, and so I also found the same of ComfyUI. Fear not, however! There is a better method. Extensions!
+By nature, ComfyUI is meant to be interacted with with mouse and keyboard. How, then, might it be automated?
 
-[`ComfyUI-to-Python-Extension`](https://github.com/pydn/ComfyUI-to-Python-Extension) by Pydn provides an easy way to generate a programmatic version (which can then be tuned/jerry-rigged, allowing for iteration and therefore automation) of any given ComfyUI workflow. From this point, all parameters can be modified iteratively - for example: on one run, use the defaults provided earlier; and on the next, change the CFG or negative prompt.
+### The Problem: UI/REST-Based Automation
+
+My initial approach for automating ComfyUI workflows involved UI-driven automation tools like Selenium or UIVision. These tools excel at simulating user interactions, but proved unreliable and time-consuming to maintain when working with the interfaces of AUTOMATIC1111 and ComfyUI.
+
+Next, I considered using AUTOMATIC1111's built-in REST API. However, its poor documentation made implementation difficult - and, once again, incredibly time-consuming. From there, I started to develop a [custom Stable Diffusion REST API](https://github.com/A-Eye-Project-for-CSC1028/a-eye-stable-diffusion-api), but the time investment required for full development was too substantial.
+
+### The Solution: ComfyUI Extensions
+
+Ultimately, I found the optimal solution to my problem - [ComfyUI-to-Python-Extension](https://github.com/pydn/ComfyUI-to-Python-Extension) by Pydn. This extension converts ComfyUI workflows into a programmatic format: Python code. This enables fine-grained control and iterative experimentation (via other external scripts). With this approach, I can easily modify parameters like CFG or negative prompts per image generation execution, facilitating proper automation.
+
+### Converting Pipelines To Scripts
 
 After following the [installation instructions for the above extension](https://github.com/pydn/ComfyUI-to-Python-Extension/blob/main/README.md) successfully, a new button should appear within ComfyUI:
 
