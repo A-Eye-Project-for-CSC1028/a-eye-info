@@ -16,6 +16,7 @@ const config: DocsThemeConfig = {
   project: {
     link: "https://github.com/A-Eye-Project-for-CSC1028/a-eye-info",
   },
+  gitTimestamp: false,
 };
 
 export default config;

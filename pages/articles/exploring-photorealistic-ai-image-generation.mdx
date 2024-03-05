@@ -1,0 +1,865 @@
+import Image from "next/image";
+import { Callout, Tabs } from "nextra/components";
+
+# Exploring Photorealistic AI Image Generation
+
+This blog article contains an overview of all progress made thus far, what is yet to come, and why I set out to work on what has become "a-eye."
+
+## Introduction
+
+I have long desired to delve into the field of AI, but just how does one get started?
+
+Many traditional university courses do not teach such principles - nor do they provide resources for development in the field - until at least the second year. Queen's gave me one of the best opportunities I could possibly ask for in this case: a shot at the CSC1028 module - an innovative module - small in size, run by Dr. John Bustard, which allows students to dive right into the deep end and create something dissimilar to anything seen before, with nothing but a brief to begin. A real challenge.
+
+As such, many of the projects in the pool are highly theoretical; not something expected to be finished in the timeframe given. Rather, this module is more about the work put in, the journey, your learnings. This is the type of thing I like! And so, with that, I present to you this blog article: a relatively short, but detailed, summary of my findings and processes leading up to current-day results.
+
+## Prerequisites
+
+This project leverages an array of technologies; gaining at least a basic understanding of these technologies not only enables you to augment its functionality if desired, but also helps you grasp the project's inner workings more comprehensively.
+
+### Related Technologies
+
+- [Python](https://www.w3schools.com/python/default.asp)
+
+<Callout>
+  Used throughout the image generation pipeline, and just for general scripting
+  purposes (such as image manipulation).
+</Callout>
+
+- [TypeScript](https://www.w3schools.com/typescript/index.php)
+
+<Callout>
+  Used to develop the model manipulation web application, hosted
+  [here](https://a-eye-vision.tech).
+</Callout>
+
+- [Three.js](https://threejs.org)
+
+<Callout>
+  Extending on the previous, Three.js allows the use of WebGL in the browser.
+  This makes for an accessible way to manipulate 3D objects for later image
+  generation.
+</Callout>
+
+- [JSON](https://www.w3schools.com/js/js_json_intro.asp)
+
+<Callout>
+  Also used in the model manipulation web application - depth information, key
+  points, camera position, screen dimensions, etc.
+</Callout>
+
+- [GLSL](https://learnopengl.com/Getting-started/Shaders)
+
+<Callout>
+  Used in determining depth map values, which involves superimposing a depth map
+  onto a 3D object - where darker shades indicate greater distance, and lighter
+  shades signify proximity to the camera.
+</Callout>
+
+- [ComfyUI](https://blenderneko.github.io/ComfyUI-docs)
+
+<Callout>
+  Although most required knowledge will be directly covered in this article, the
+  above link leading to the community documentation is really helpful for extra
+  bits of knowledge.
+</Callout>
+
+### Development Tools
+
+My IDE of choice is [Visual Studio Code,](https://code.visualstudio.com) thanks to the wealth of extensions available across all technologies thus improving the development experience. In any case, all modern IDEs should do the trick - use your favourite!
+
+## Getting Started With Stable Diffusion
+
+The main site of exploration for this project is AI art generation, and more so photorealism. To do this, it is massively important to understand what certain terms mean, and how to manipulate generation settings to acheive the results desired. But first, a bit of background. What is Stable Diffusion?
+
+### Stable Diffusion: The What
+
+> Stable Diffusion is a generative artificial intelligence (generative AI) model that produces unique photorealistic images from text and image prompts. It originally launched in 2022. Besides images, you can also use the model to create videos and animations. The model is based on diffusion technology and uses latent space. This significantly reduces processing requirements, and you can run the model on desktops or laptops equipped with GPUs. Stable Diffusion can be fine-tuned to meet your specific needs with as little as five images through transfer learning.
+>
+> \- [Amazon Web Services (AWS)](https://aws.amazon.com/what-is/stable-diffusion)
+
+### Basic Glossary: Stable Diffusion
+
+**Diffusion Model:** The AI engine itself - it creates by "denoising" images, gradually transforming random noise into something recognisable within latent space.
+
+**Workflow:** Think of this as your image generation recipe; it is a series of steps the AI follows. Within ComfyUI, workflows are built by connecting different blocks (called 'nodes'), each performing a specific task.
+
+**Positive Prompt:** This is a description of what you _do_ want to appear in your image.
+
+**Negative Prompt:** The opposite of a positive prompt; it tells the AI what to _avoid._
+
+**Sampler:** An algorithm used by the diffusion model determining how the image is generated step-by-step. Different samplers can give different results, even with the same prompts, and performance differs between each sampler.
+
+**CFG:** Determines how strict a diffusion model should be with a given prompt; usually between 0 and 30. If the number is lower, the AI is granted more creative liberty over the image.
+
+**Denoising Strength:** A value between 0 and 1 that influences the level of detail and coherence in the generated images. The sweet spot is generally between 0.5 and 1 (inclusive); anything lower will likely produce blurry images.
+
+## Rendering 3D Models in the Browser
+
+If you have meddled with `text2img` generation in the past, you might notice that - often times - a lot of the image is deformed, or not quite what you expected it to be. Changing your prompt may help - even still, consistency cannot be guaranteed.
+
+To remedy this, low-poly 3D models can be used to create a precise depth map. This method establishes a foundational structure for the AI to easily figure out how to apply the relevant texture on it accurately, leading to a final image that exhibits realistic depth, shading, and highlights. Additionally, a significant advantage of this approach is the ability to precisely position objects within a scene.
+
+### Example Image: Text-to-Image vs. A-Eye Pipeline
+
+To demonstrate this, I have provided two images below generated using the same positive/negative prompt (both of which are also displayed below). Study these carefully.
+
+#### Positive Prompt
+
+```
+photograph by Max Rive, A striking living room interior, sofa furniture, a living room table, bookshelves, shelving, a fireplace, elegant interior design, perfect layout, consistent colors, moody, hazy, cinematic, surreal, highest resolution, high detail, intricate, best quality, masterpiece, golden ratio
+```
+
+#### Negative Prompt
+
+```
+canvas frame, cartoon, 3d, ((disfigured)), ((bad art)), ((deformed)),((extra limbs)),((close up)),((b&w)), wierd colors, blurry, (((duplicate))), ((morbid)), ((mutilated)), [out of frame], extra fingers, mutated hands, ((poorly drawn hands)), ((poorly drawn face)), (((mutation))), (((deformed))), ((ugly)), blurry, ((bad anatomy)), (((bad proportions))), ((extra limbs)), cloned face, (((disfigured))), out of frame, ugly, extra limbs, (bad anatomy), gross proportions, (malformed limbs), ((missing arms)), ((missing legs)), (((extra arms))), (((extra legs))), mutated hands, (fused fingers), (too many fingers), (((long neck))), Photoshop, video game, ugly, tiling, poorly drawn hands, poorly drawn feet, poorly drawn face, out of frame, mutation, mutated, extra limbs, extra legs, extra arms, disfigured, deformed, cross-eye, body out of frame, blurry, bad art, bad anatomy, 3d render
+```
+
+<Tabs items={["Text-to-Image", "ControlNet Depth"]}>
+  <Tabs.Tab>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <Image
+        src="/exploring-photorealistic-ai-image-generation/sofa-text2img.png"
+        width={1024}
+        height={1024}
+        style={{ borderRadius: "1em" }}
+        alt="An image of a cosy living room as generated by Stable Diffusion v2.1 via text2img mode."
+      />
+    </div>
+  </Tabs.Tab>
+  <Tabs.Tab>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <Image
+        src="/exploring-photorealistic-ai-image-generation/sofa-depth2img.png"
+        width={1024}
+        height={1024}
+        style={{ borderRadius: "1em" }}
+        alt="An image of a cosy living room as generated by Stable Diffusion XL v1.0 (ControlNet Depth)."
+      />
+    </div>
+  </Tabs.Tab>
+</Tabs>
+
+Although both images clearly depict a sofa in a living room as requested, the subject of the `text2img` version appears to be much more deformed when compared to the image generated by my enhanced process (using ControlNet Depth).
+
+The sofa would not quite fit into the scene if it were real - why would there be books behind the sofa; you cannot easily reach them to read. Having the flexibility to position the sofa at will has allowed Stable Diffusion to more precisely construct the surrounding environment around the subject.
+
+It is important to note that in both the background scene is still not perfect - the coming month will be spent on improving background generation & consistency at different camera angles.
+
+### Three.js (WebGL)
+
+Using the Three.js library, I have developed an easy-to-use, publicly-accessible tool that allows anyone to upload their own 3D models, project a depth map, and then export the relevant data for both image generation and object detection.
+
+<Callout>These objects must be of the `.obj` format.</Callout>
+
+The tool - at its simplest - works like so: it initialises a rendering context, camera, and control mechanisms (mousing/dragging across axes) for user interaction. A 3D model is loaded into the `Viewer` class via the `Select Model` UI element. `Toggle Depth Map`, when activated, employs shaders to overlay a depth map onto an object. Following this, an image representing the depth map - along with [JSON data detailing depth and vertex positions](#exporting-data-json-structure) - can be exported. This process facilitates a nuanced manipulation of 3D objects, allowing for the creation of images that accurately reflect the spatial characteristics of the object to then be transplanted into a realistic scene.
+
+Initially, the scene was set against a green backdrop; before incorporating ComfyUI into my project, I experimented with blending the green screen image with a depth map to selectively alter the background. This method did not yield the desired result, leading to its discontinuation in my process. Nevertheless, I believe retaining this feature within the tool could still offer value to some users.
+
+#### Exporting Data: JSON Structure
+
+Implementing TypeScript in a web application significantly enhances the ability to structure a robust JSON schema. By pre-defining interfaces, we can maintain constant type safety, ensuring that the structure is always consistent and delivers the expected results.
+
+```ts
+import { Vector2, Vector3 } from "three";
+
+export interface Depth {
+  position: Vector2 | Vector3; // V2 (Screen Space) | V3 (World Space)
+  isVertexVisible: boolean;
+}
+
+export interface Space {
+  cameraPosition: Vector3;
+  screenSpace?: Depth;
+  worldSpace?: Depth;
+}
+
+export interface SceneMetadata {
+  canvasSize: Vector2;
+  space: Space;
+}
+```
+
+#### Interface: `Depth`
+
+As a JSON structure, `Depth` would look like the following:
+
+```json
+{
+  "position": {
+    "x": number,
+    "y": number,
+    "z": number // NOTE: "z" is only present if calculating position in 3D space.
+  },
+  "isVertexVisible": boolean
+}
+```
+
+This holds the coordinates for an object in space, allowing for both two-dimensional (2D) and three-dimensional (3D) positioning. The `x` and `y` values determine the object's location on a plane, while the optional `z` value adds depth for 3D environments. `isVertexVisible` is currently unused, but will improve accuracy when it comes to object detection in the future.
+
+#### Interface: `Space`
+
+As a JSON structure, `Space` would look like the following:
+
+```json
+{
+  "cameraPosition": {
+    "x": number,
+    "y": number,
+    "z": number
+  },
+  "screenSpace": {
+    "position": {
+      "x": number,
+      "y": number,
+      "z": number
+    },
+    "isVertexVisible": boolean
+  },
+  "worldSpace": {
+    "position": {
+      "x": number,
+      "y": number,
+      "z": number
+    },
+    "isVertexVisible": boolean
+  }
+}
+```
+
+This holds information on the positioning and depth of objects in a virtual environment: `cameraPosition` sets the viewpoint in three-dimensional space, while `screenSpace` and `worldSpace` describe the depth relative to the screen and the overall virtual world, respectively.
+
+#### Interface: `SceneMetadata`
+
+As a JSON structure, `SceneMetadata` would look like the following:
+
+```json
+{
+  "canvasSize": {
+    "x": number,
+    "y": number
+  },
+  "space": {
+    "cameraPosition": {
+      "x": number,
+      "y": number,
+      "z": number
+    },
+    "screenSpace": {
+      "position": {
+        "x": number,
+        "y": number,
+        "z": number
+      },
+      "isVertexVisible": boolean
+    },
+    "worldSpace": {
+      "position": {
+        "x": number,
+        "y": number,
+        "z": number
+      },
+      "isVertexVisible": boolean
+    }
+  }
+}
+```
+
+This object uses the `Space` schema from earlier, and also adds another `Vector2` to determine the canvas size. This information allows for object detection to be performed accurately, as it tells us exactly where all relevant points are; thanks to the current image generation pipeline, this information will stay constant across the generated and source images.
+
+### Depth Mapping
+
+Depth map projection is a graphical rendering technique that enhances the perception of depth in 3D environments. This process is often performed by estimation (using a tool such as MiDAS). However, since we have direct access to all vertices of any given 3D model, we can precisely measure distance from the camera - this enables the AI model to 'see' how far away things are accurately.
+
+This process involves two key components: the `Vertex` and `Fragment` shaders, the functionality of which will now be explained below.
+
+#### Vertex Shader
+
+A vertex shader is tasked with the transformation of each vertex's position on the 3D model to a 2D coordinate. When the depth shader is toggled, this process is carried out by the GPU whenever the depth shader is toggled, and also upon movement of the camera thereafter.
+
+```glsl
+varying vec2 vUv;
+
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+```
+
+The above GLSL code assigns texture coordinates to variable `vUv` and calculates the position of each vertex in clip space by multiplying the vertex position with the "model-view" and "projection" matrices.
+
+#### Fragment Shader
+
+A fragment shader is tasked with defining RGBA (red, green, blue & alpha) colours for each pixel being processed - a single fragment shader is called once per pixel. Again, this process is carried out by the GPU whenever the depth shader is toggled, and also upon movement of the camera thereafter.
+
+```glsl
+#include <packing>
+
+varying vec2 vUv;
+uniform sampler2D tDiffuse;
+uniform sampler2D tDepth;
+uniform float cameraNear;
+uniform float cameraFar;
+
+float readDepth(sampler2D depthSampler, vec2 coord) {
+  float fragCoordZ = texture2D(depthSampler, coord).x;
+  float viewZ = perspectiveDepthToViewZ(fragCoordZ, cameraNear, cameraFar);
+  return viewZToOrthographicDepth(viewZ, cameraNear, cameraFar);
+}
+
+void main() {
+  float depth = readDepth(tDepth, vUv);
+
+  gl_FragColor.rgb = 1.0 - vec3(depth);
+  gl_FragColor.a = 1.0;
+}
+```
+
+The above GLSL code reads the depth value from a depth texture (passed through as a uniform from Three.js) for each fragment, converts it from perspective to orthographic depth, and maps this depth to a grayscale color, where closer fragments are lighter than those farther away (which are darker).
+
+## Image Generation Pipelines
+
+In the industry, there exist two primary GUI applications that dominate the creation of images using Stable Diffusion models: `AUTOMATIC1111` and `ComfyUI`.
+
+During my two-month experience working on a-eye, I have explored both tools extensively and concluded that ComfyUI is the superior choice for this project. It offers a more detailed manipulation experience, allowing for the creation of more intricate images due to its wider range of adjustable settings. Moreover, ComfyUI facilitates a greater degree of automation - a feature that will be elaborated on in a [later section of this article](#automating-image-generation-pipelines).
+
+So, what does a ComfyUI workflow look like, and how does one work? To help answer this, I have provided a bird's eye view of my current workflow below:
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/exploring-photorealistic-ai-image-generation/comfy-workflow/top-down-view.png"
+    width={1024}
+    height={1024}
+    style={{ borderRadius: "1em" }}
+    alt="A top down view of the current a-eye image generation workflow in ComfyUI (as of 29/02/2024)."
+  />
+</div>
+
+At a glance, it may be a little difficult to grasp exactly what is going on here, so I will break it down into its core components to help with understanding. To explain the process, I have broken it up into 3 main logical sectors: [`Using A ControlNet`](#using-a-controlnet), [`Configuring the Sampler`](#configuring-the-sampler), and [`Finalisation`](#finalisation).
+
+### Using A ControlNet
+
+Rather centrally on the workflow image lives the "Apply ControlNet (Advanced)" node - this is a core part of the image generation process, as it essentially forces the image to be generated using our 3D model in the described location in a given scene.
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/exploring-photorealistic-ai-image-generation/comfy-workflow/apply-controlnet.png"
+    width={512}
+    height={512}
+    style={{ borderRadius: "1em" }}
+    alt="Depicts part of the aforementioned ComfyUI workflow - shows the required data for ControlNet application."
+  />
+</div>
+
+In order to make this happen, some data must be provided to this node:
+
+- Positive Prompt
+- Negative Prompt
+- ControlNet LoRA/Checkpoint
+- Depth Map (Image)
+
+#### Loading ControlNet Depth LoRA/Checkpoint
+
+ControlNets are pre-trained, and can be obtained from sites online like Hugging Face. For a-eye, I use the [256-rank editions of Stability.AI's Control LoRAs](https://huggingface.co/stabilityai/control-lora/tree/main/control-LoRAs-rank256).
+
+Any of these models can be loaded in, but only [`control-lora-depth-rank256.safetensors`](https://huggingface.co/stabilityai/control-lora/blob/main/control-LoRAs-rank256/control-lora-depth-rank256.safetensors) is of use here; thus, it is loaded in like so:
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/exploring-photorealistic-ai-image-generation/comfy-workflow/load-controlnet.png"
+    width={512}
+    height={512}
+    style={{ borderRadius: "1em" }}
+    alt="Depicts part of the aforementioned ComfyUI workflow - shows where the ControlNet is loaded in."
+  />
+</div>
+
+#### Uploading A Depth Map (Image)
+
+Looking at the bottom-left quadrant of the above workflow, you will see the following:
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/exploring-photorealistic-ai-image-generation/comfy-workflow/depth-image-upload.png"
+    width={512}
+    height={512}
+    style={{ borderRadius: "1em" }}
+    alt="Depicts part of the aforementioned ComfyUI workflow - shows where base depth map image is uploaded."
+  />
+</div>
+
+As this process is - at its simplest - an image-to-image generation technique, we must provide a base image for the diffusion model to work from. In this case, it will be a depth map.
+
+Finally, for the ControlNet to work, the positive/negative prompts must be piped through. However, this depends on the the Stable Diffusion checkpoint being loaded, as these prompts are processed by said model.
+
+#### Loading Stable Diffusion Model/Checkpoint
+
+This node has 3 components to it - CLIP (hooked up to the [prompts](#providing-positive-negative-prompts)), model (hooked up to a [`KSampler`](#configuring-the-sampler)), and VAE (later hooked up to a `VAE Decode` node). The latter 2 will be described in further detail later on.
+
+My model of choice is Stable Diffusion XL Base v1.0, as it is especially good for photorealism when compared to other models:
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/exploring-photorealistic-ai-image-generation/comfy-workflow/load-sdxl.png"
+    width={512}
+    height={512}
+    style={{ borderRadius: "1em" }}
+    alt="Depicts part of the aforementioned ComfyUI workflow - shows where SDXL checkpoint is loaded."
+  />
+</div>
+
+#### Providing Positive & Negative Prompts
+
+To help the AI generate an image in the style/of the form that is desired, two types of prompt should be provided describing the image. As you might recall from the ["Stable Diffusion Glossary,"](#basic-glossary-stable-diffusion) a positive prompt tells the model what we _do_ want, and a negative prompt tells it what we _do not_ want.
+
+Prompts in ComfyUI are entered into `CLIP Text Encode (Prompt)` nodes; these can be found at the top and near the middle of my workflow.
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/exploring-photorealistic-ai-image-generation/comfy-workflow/prompt-boxes.png"
+    width={512}
+    height={512}
+    style={{ borderRadius: "1em" }}
+    alt="Depicts part of the aforementioned ComfyUI workflow - shows the prompt boxes."
+  />
+</div>
+
+<Callout>
+  A top tip when building a ComfyUI workflow - make sure to keep it organised!
+  An example of this is with the prompts portion of mine - through the use of
+  colour-coding, it is easy to see which prompt is which: green for positive,
+  red for negative.
+</Callout>
+
+### Configuring the Sampler
+
+Now that the ControlNet is configured, the image sampler can now be configured. To do this, we 'wire up' the positive & negative prompts, along with the model. That is almost enough to generate an image; however, we need one more thing - an empty latent image. This essentially creates a canvas for our generated image to be placed on.
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/exploring-photorealistic-ai-image-generation/comfy-workflow/ksampler.png"
+    width={512}
+    height={512}
+    style={{ borderRadius: "1em" }}
+    alt="Depicts part of the aforementioned ComfyUI workflow - shows the sampler configuration node."
+  />
+</div>
+
+#### Empty Latent Image
+
+Theoretically, this can be of any size, but there are advisable dimensions for different diffusion model types. For this use case, 1024x1024 is optimal, as this is what SDXL is used to. Only 1 latent image is required, so `batch_size` is set to `1`.
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/exploring-photorealistic-ai-image-generation/comfy-workflow/empty-latent-image.png"
+    width={512}
+    height={512}
+    style={{ borderRadius: "1em" }}
+    alt="Depicts part of the aforementioned ComfyUI workflow - shows the empty latent image node."
+  />
+</div>
+
+### Finalisation
+
+Lastly, to produce the final result, the final latent image needs to be "decompressed," or "decoded." Essentially, the workflow generates a "compressed" result, and to finalise this workflow it is essential to use a [`VAE (Variational Auto-Encoder) Decode`](https://towardsdatascience.com/understanding-variational-autoencoders-vaes-f70510919f73) node to provide an intelligible result. It takes in the latent image that was previously processed by the `KSampler`, and the VAE (in this instance tied to the Stable Diffusion model), ultimately being piped to a `Save Image` node - thus completing the process.
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/exploring-photorealistic-ai-image-generation/comfy-workflow/vae-decode-and-save.png"
+    width={512}
+    height={512}
+    style={{ borderRadius: "1em" }}
+    alt="Depicts part of the aforementioned ComfyUI workflow - shows the final two nodes in the workflow; decoding and saving."
+  />
+</div>
+
+#### Note: Organisation
+
+As you might have noticed, at the top of the workflow are two nodes that appear to be empty, yet they are connected up to the `VAE Decode` and `Load Checkpoint` nodes.
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/exploring-photorealistic-ai-image-generation/comfy-workflow/vae-extenders.png"
+    width={512}
+    height={512}
+    style={{ borderRadius: "1em" }}
+    alt="Depicts part of the aforementioned ComfyUI workflow - shows the 2 VAE extenders running across the top of the workflow."
+  />
+</div>
+
+These do not do anything in terms of new functionality, rather they are just extenders for the VAE wire in order to keep the presentation in check.
+
+## Automating Image Generation Pipelines
+
+By nature, ComfyUI is meant to be interacted with with mouse and keyboard. How, then, might it be automated? My first thought was via Selenium or UIVision, as settings could easily be changed by simulating mouse clicks & keyboard inputs. I had tried the same before with `AUTOMATIC1111`, but it was buggy and time-consuming to fix, and so I also found the same of ComfyUI. Fear not, however! There is a better method. Extensions!
+
+[`ComfyUI-to-Python-Extension`](https://github.com/pydn/ComfyUI-to-Python-Extension) by Pydn provides an easy way to generate a programmatic version (which can then be tuned/jerry-rigged, allowing for iteration and therefore automation) of any given ComfyUI workflow. From this point, all parameters can be modified iteratively - for example: on one run, use the defaults provided earlier; and on the next, change the CFG or negative prompt.
+
+After following the [installation instructions for the above extension](https://github.com/pydn/ComfyUI-to-Python-Extension/blob/main/README.md) successfully, a new button should appear within ComfyUI:
+
+<br />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
+  <Image
+    src="/exploring-photorealistic-ai-image-generation/comfy-workflow/save-api-format.png"
+    width={128}
+    height={128}
+    alt="Depicts part of the aforementioned ComfyUI workflow - shows the save to API format button."
+  />
+</div>
+
+Clicking this saves an API-compatible JSON version of the current workflow, which can then be converted to a Python script using the extension itself; that then looks something like the following:
+
+```python
+import random
+import torch
+import sys
+
+sys.path.append("../")
+from nodes import (
+    VAEDecode,
+    KSamplerAdvanced,
+    EmptyLatentImage,
+    SaveImage,
+    CheckpointLoaderSimple,
+    CLIPTextEncode,
+)
+
+
+def main():
+    with torch.inference_mode():
+        checkpointloadersimple = CheckpointLoaderSimple()
+        checkpointloadersimple_4 = checkpointloadersimple.load_checkpoint(
+            ckpt_name="sd_xl_base_1.0.safetensors"
+        )
+
+        emptylatentimage = EmptyLatentImage()
+        emptylatentimage_5 = emptylatentimage.generate(
+            width=1024, height=1024, batch_size=1
+        )
+
+        cliptextencode = CLIPTextEncode()
+        cliptextencode_6 = cliptextencode.encode(
+            text="evening sunset scenery blue sky nature, glass bottle with a galaxy in it",
+            clip=checkpointloadersimple_4[1],
+        )
+
+        cliptextencode_7 = cliptextencode.encode(
+            text="text, watermark", clip=checkpointloadersimple_4[1]
+        )
+
+        checkpointloadersimple_12 = checkpointloadersimple.load_checkpoint(
+            ckpt_name="sd_xl_refiner_1.0.safetensors"
+        )
+
+        cliptextencode_15 = cliptextencode.encode(
+            text="evening sunset scenery blue sky nature, glass bottle with a galaxy in it",
+            clip=checkpointloadersimple_12[1],
+        )
+
+        cliptextencode_16 = cliptextencode.encode(
+            text="text, watermark", clip=checkpointloadersimple_12[1]
+        )
+
+        ksampleradvanced = KSamplerAdvanced()
+        vaedecode = VAEDecode()
+        saveimage = SaveImage()
+
+        for q in range(10):
+            ksampleradvanced_10 = ksampleradvanced.sample(
+                add_noise="enable",
+                noise_seed=random.randint(1, 2**64),
+                steps=25,
+                cfg=8,
+                sampler_name="euler",
+                scheduler="normal",
+                start_at_step=0,
+                end_at_step=20,
+                return_with_leftover_noise="enable",
+                model=checkpointloadersimple_4[0],
+                positive=cliptextencode_6[0],
+                negative=cliptextencode_7[0],
+                latent_image=emptylatentimage_5[0],
+            )
+
+            ksampleradvanced_11 = ksampleradvanced.sample(
+                add_noise="disable",
+                noise_seed=random.randint(1, 2**64),
+                steps=25,
+                cfg=8,
+                sampler_name="euler",
+                scheduler="normal",
+                start_at_step=20,
+                end_at_step=10000,
+                return_with_leftover_noise="disable",
+                model=checkpointloadersimple_12[0],
+                positive=cliptextencode_15[0],
+                negative=cliptextencode_16[0],
+                latent_image=ksampleradvanced_10[0],
+            )
+
+            vaedecode_17 = vaedecode.decode(
+                samples=ksampleradvanced_11[0], vae=checkpointloadersimple_12[2]
+            )
+
+            saveimage_19 = saveimage.save_images(
+                filename_prefix="ComfyUI", images=vaedecode_17[0]
+            )
+
+
+if __name__ == "__main__":
+    main()
+```
+
+Finally, in my case, such a script can be refactored for ease-of-use in other scripts, i.e. to iterate through generation properties.
+
+```python
+import os
+import random
+import sys
+
+import torch
+
+# https://github.com/A-Eye-Project-for-CSC1028/a-eye-generator/blob/master/scripts/image_generator/generation_parameters.py
+from .generation_parameters import GenerationParameters
+
+# https://github.com/A-Eye-Project-for-CSC1028/a-eye-generator/blob/master/scripts/image_generator/utils.py
+from .utils import *
+
+
+def generate(parameters: GenerationParameters = GenerationParameters()):
+    # Get config details, such as where ComfyUI is located at on the user's computer.
+    config = parse_config()
+    comfy_path = config.get("COMFY_DIRECTORY")
+
+    # Add ComfyUI to sys.path...
+    if comfy_path is not None and os.path.isdir(comfy_path):
+        sys.path.append(comfy_path)
+
+    # Import ComfyUI's nodes.py module:
+    nodes = import_nodes_module(comfy_path)
+
+    with torch.inference_mode():
+        # Load image from path:
+        image_loader = nodes.LoadImage()
+        image = image_loader.load_image(image=parameters.image)
+
+        # Load Stable Diffusion checkpoint (safetensors/ckpt):
+        checkpoint_loader_simple = nodes.CheckpointLoaderSimple()
+        checkpoint = checkpoint_loader_simple.load_checkpoint(
+            ckpt_name="sd_xl_base_1.0.safetensors"
+        )
+
+        # Load appropriate ControlNet checkpoint (safetensors/ckpt):
+        controlnet_loader = nodes.ControlNetLoader()
+        controlnet = controlnet_loader.load_controlnet(
+            control_net_name="control-lora\control-LoRAs-rank256\control-lora-depth-rank256.safetensors"
+        )
+
+        clip_text_encode = nodes.CLIPTextEncode()
+
+        # Encode positive prompt:
+        positive_prompt_encode = clip_text_encode.encode(
+            text=parameters.positive_prompt,
+            clip=get_value_at_index(checkpoint, 1),
+        )
+
+        # Encode negative prompt:
+        negative_prompt_encode = clip_text_encode.encode(
+            text=parameters.negative_prompt,
+            clip=get_value_at_index(checkpoint, 1),
+        )
+
+        # Define an empty latent image, and then size it appropriately.
+        empty_latent_image = nodes.EmptyLatentImage()
+        usable_latent_image = empty_latent_image.generate(
+            width=parameters.dimensions.x,
+            height=parameters.dimensions.y,
+            batch_size=1,
+        )
+
+        # Prepare for image generation...
+        controlnet_apply_advanced = nodes.ControlNetApplyAdvanced()
+        k_sampler = nodes.KSampler()
+        vae_decoder = nodes.VAEDecode()
+        image_writer = nodes.SaveImage()
+
+        # Generate as many images as in parameters!
+        for _ in range(parameters.iterations):
+            controlnet_applied = controlnet_apply_advanced.apply_controlnet(
+                strength=1,
+                start_percent=0,
+                end_percent=1,
+                positive=get_value_at_index(positive_prompt_encode, 0),
+                negative=get_value_at_index(negative_prompt_encode, 0),
+                control_net=get_value_at_index(controlnet, 0),
+                image=get_value_at_index(image, 0),
+            )
+
+            sampled_image = k_sampler.sample(
+                seed=random.randint(1, 2**64),
+                steps=parameters.steps,
+                cfg=parameters.cfg,
+                sampler_name=parameters.sampler,
+                scheduler=parameters.scheduler,
+                denoise=parameters.denoise,
+                model=get_value_at_index(checkpoint, 0),
+                positive=get_value_at_index(controlnet_applied, 0),
+                negative=get_value_at_index(controlnet_applied, 1),
+                latent_image=get_value_at_index(usable_latent_image, 0),
+            )
+
+            decoded_image = vae_decoder.decode(
+                samples=get_value_at_index(sampled_image, 0),
+                vae=get_value_at_index(checkpoint, 2),
+            )
+
+            image_writer.save_images(
+                images=get_value_at_index(decoded_image, 0))
+```
+
+And voila! ComfyUI workflows can now operate in full automation, functioning independently of the server. This finding allows for any workflow to be automated, opening up vast possibilities for AI art generation to evolve more swiftly.
+
+## Next Steps
+
+### Further Enhancing Photorealism
+
+A major challenge encountered during my image generation work has been keeping objects consistent across different camera angles.
+
+Here are a few approaches to address this issue. Firstly and simply enough, more 3D objects could be placed around the scene manually; for example, in the case of a living room as before, I could place a coffee table model in front of - or maybe next to - the sofa (main subject). This would guarantee the position of each object no matter the camera angle, but even still results would not be reliable. Stable Diffusion still might 'decide' to change how the entire surrounding looks like, as it does not understand that it should be the same. Additionally, this approach would require much more time and manual involvement - requires a multitude of scenes to be composed by hand.
+
+Another option would be to attempt 'billboarding,' a technique where a flat image is placed up against/behind the main subject, and maybe some beside. This could work to persist the background across varying camera angles; however, it also has its drawbacks. Visual artifacts could appear, especially if the billboard image provided contains a watermark - as is apparent, this can be combatted by simply finding high-quality images to use. Despite that, this technique may produce overly flat images, thus reatracting photorealitic style element in some cases.
+
+The focal point for this image generation pipeline, currently, is to generate photorealistic images of building interiors (the default model my online tool provides is a sofa/couch). However, a future goal is to expand its functionality into an accessibility tool for those with visual impairments. By pairing the software with mixed-reality headsets, users could virtually navigate their environment and locate objects much more easily.
+
+To increase accuracy of generation, a grammatical object placement system could be another viable improvement mechanism. It allows users to describe object type & placement with text commands (e.g., "coffee table, bottom-left"). This functionality, similar to TailwindCSS HTML classes, would translate those commands into 3D object placement within a designated area of the scene.
+
+With existing software known as ["StableProjectorz,"](https://stableprojectorz.com) it becomes feasible to apply generative texturing techniques to 3D models. With enhancements to the ComfyUI workflow, it is therefore possible to accurately preserve the texture of an object - viewed from any angle - hence allowing competent scene modulation. This method is the most experimental mentioned here, but is definitely worth trying; getting this working properly may exceed the timeframe given for this project, and thus can be continued at a later time.
+
+As is apparent, a multitude of options exist to further enhance a-eye's image generation capabilities; the best approach of all might be to mix-and-match a couple!
+
+### Object Detection
+
+It could be wise to revisit enhancing the generated outcomes later and currently redirect attention towards the object detection aspect of the project; the objects derived from the 3D models are already quite realistic in appearance, and thus developing an initial version of this system might assist me to attain my goals for this project more swiftly.
+
+[Ultralytics' YOLOv8.1](https://github.com/ultralytics/ultralytics) (the most current model available) offers a straightforward path to implementing a proof-of-concept iteration. At this point in time, there appears to be a use for most of YOLO's capabilities in the accessibility system planned:
+
+- Classify: Accurately label objects in real-time, enabling visually-impaired users to more confidently identify their surroundings using mixed-reality headsets and auditory feedback.
+- Detect: Provide confidence scores for object identification (supporting debugging efforts) and calculate object coverage within the field of view (i.e. taking up 43% of the display), offering critical spatial information to the user.
+- Track: Dynamically monitor object positioning, movement, and distances. Alert the user to potential hazards in their path both visually and audibly, enhancing safe pathfinding both indoors and outdoors.
+
+Using these capabilities in harmony could lead to a very competent object detection system, thus increasing quality of life for those who are hard of sight. There are also other uses for such a system, and all is experimental.
+
+## Additional Resources
+
+Below is a collection of links to resources used throughout the development of this project thus far:
+
+- [Poly Pizza](https://poly.pizza) - a great place to obtain free-to-use (Creative Commons), low-poly 3D models.
+- [Shotdeck](https://shotdeck.com) - a library high-quality film scenes - useful for "billboarding".
+
+## Afterword
+
+It is my hope that the information provided to you in this article has been valuable in helping to get up and running, and to make any further progress with this project.
+
+All code written throughout the course of this module has been made [publicly-available via GitHub](https://github.com/A-Eye-Project-for-CSC1028), so please feel free to explore!
