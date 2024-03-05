@@ -16,6 +16,9 @@ const config: DocsThemeConfig = {
   project: {
     link: "https://github.com/A-Eye-Project-for-CSC1028/a-eye-info",
   },
+  footer: {
+    text: "MIT Licence | © Aidan Juma 2024-present",
+  },
   gitTimestamp: false,
 };
 
