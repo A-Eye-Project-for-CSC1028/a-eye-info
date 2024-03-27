@@ -13,6 +13,30 @@ Many traditional university courses do not teach such principles - nor do they p
 
 As such, many of the projects in the pool are highly theoretical; not something expected to be finished in the timeframe given. Rather, this module is more about the work put in, the journey, your learnings. This is the type of thing I like! And so, with that, I present to you this blog article: a relatively short, but detailed, summary of my findings and processes leading up to current-day results.
 
+## Overview: Project Vision
+
+This project has always held lofty goals; it aims to achieve a pioneering breakthrough - something never seen before. So, before taking the plunge, let's define the problem domain it seeks to solve. What is the "a-eye-vision?"
+
+From the beginning, the wider aim for a-eye was to create an almost fully-automated, self-training object recognition computer vision system - achieved by virtue of low-poly 3D models, their depth information, and the Stable Diffusion image generation AI. Removing the need to go out in the field and obtain training data - instead obtaining it through means of careful generation - the speed at which such a system could get better might increase exponentially. Thus, leading to a highly-malleable, powerful, and innovative technology.
+
+With accurate taxonomy, enough high-quality generated images, and time - it really could be possible to create such a highly-capable system. Something that could really help humanity - how, you may ask? Well, a couple of use cases spring to mind:
+
+### Visual Novel Creation
+
+In the case of visual novels, background art creation is often a time-consuming part of the process. With some work to improve consistency of image generation at differing camera angles, and multiple object placement in my web tool's scene, the perceived creativity afforded by AI allows for multiple iterations of a background to be created in many different styles - more quickly and easily than ever before.
+
+### Accessibility
+
+Recent developments in technology have prompted a shift in the way we interact with our devices. Namely, mixed reality and the metaverse through headsets such as the Apple Vision Pro & Meta Quest 3. As these systems continue to evolve - get cheaper, faster, et cetera - more people will likely be exposed to them: they will become more accessible.
+
+As such, using these headsets as a vector to aid those who are visually-impaired to better understand their surroundings: where things are in relation to them, if something is moving or not and in which direction - just to name a few scenarios - a-eye could prove to be a real game-changer for these users.
+
+### Waste Management
+
+Pollution is a major global threat, destroying habitats with toxic emissions and plastic waste. Recycling initiatives, aided by automation like [AMP's](https://ampsortation.com/) technology, are making progress: "...we give waste and recycling leaders the power to reduce labor costs, increase resource recovery, and deliver more reliable operations."
+
+Further development of A-Eye technology could make these automated sorting solutions significantly more affordable and efficient. This would enable wider adoption of recycling services, even in lower-income areas of the world.
+
 ## Prerequisites
 
 This project leverages an array of technologies; gaining at least a basic understanding of these technologies not only enables you to augment its functionality if desired, but also helps you grasp the project's inner workings more comprehensively.
@@ -171,6 +195,64 @@ The tool - at its simplest - works like so: it initialises a rendering context, 
 
 Initially, the scene was set against a green backdrop; before incorporating ComfyUI into my project, I experimented with blending the green screen image with a depth map to selectively alter the background. This method did not yield the desired result, leading to its discontinuation in my process. Nevertheless, I believe retaining this feature within the tool could still offer value to some users.
 
+### Depth Mapping
+
+Depth map projection is a graphical rendering technique that enhances the perception of depth in 3D environments. This process is often performed by estimation (using a tool such as MiDAS). However, since we have direct access to all vertices of any given 3D model, we can precisely measure distance from the camera - this enables the AI model to 'see' how far away things are accurately.
+
+This process involves two key components: the `Vertex` and `Fragment` shaders, the functionality of which will now be explained below.
+
+#### Vertex Shader
+
+A vertex shader is tasked with the transformation of each vertex's position on the 3D model to a 2D coordinate. When the depth shader is toggled, this process is carried out by the GPU whenever the depth shader is toggled, and also upon movement of the camera thereafter.
+
+```glsl
+varying vec2 vUv;
+
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+```
+
+The above GLSL code assigns texture coordinates to variable `vUv` and calculates the position of each vertex in clip space by multiplying the vertex position with the "model-view" and "projection" matrices.
+
+#### Fragment Shader
+
+A fragment shader is tasked with defining RGBA (red, green, blue & alpha) colours for each pixel being processed - a single fragment shader is called once per pixel. Again, this process is carried out by the GPU whenever the depth shader is toggled, and also upon movement of the camera thereafter.
+
+```glsl
+#include <packing>
+
+varying vec2 vUv;
+uniform sampler2D tDiffuse;
+uniform sampler2D tDepth;
+uniform float cameraNear;
+uniform float cameraFar;
+
+float readDepth(sampler2D depthSampler, vec2 coord) {
+  float fragCoordZ = texture2D(depthSampler, coord).x;
+  float viewZ = perspectiveDepthToViewZ(fragCoordZ, cameraNear, cameraFar);
+  return viewZToOrthographicDepth(viewZ, cameraNear, cameraFar);
+}
+
+void main() {
+  float depth = readDepth(tDepth, vUv);
+
+  gl_FragColor.rgb = 1.0 - vec3(depth);
+  gl_FragColor.a = 1.0;
+}
+```
+
+The above GLSL code reads the depth value from a depth texture (passed through as a uniform from Three.js) for each fragment, converts it from perspective to orthographic depth, and maps this depth to a grayscale color, where closer fragments are lighter than those farther away (which are darker).
+
+### Object Recognition: Baby Steps
+
+Understanding spatial relationships is key to how we see the world, and it's just as important for computer vision! Like our eyes make use of depth information to make sense of our surroundings, accurate object recognition relies on knowing the position of every single vertex that makes up the object. To obtain this information for a 2D image, we first need to get the relevant positional data in 3D space - then scaling these appropriately for any given image resolution.
+
+These 2D "sceen-space" coordinates tell us where the object sits within the image. With the correct scaling, we can always find the exact location of the object across multiple generated images derived from the same depth map - owing entirely to said depth map. Plus, since the generated images are based on a labelled 3D model of a known real-world object, we can apply valid taxonomy with ease! This opens the door to creating a huge and diverse dataset for a powerful computer vision system.
+
+On that note, what does this data look like?
+
 #### Exporting Data: JSON Structure
 
 Implementing TypeScript in a web application significantly enhances the ability to structure a robust JSON schema. By pre-defining interfaces, we can maintain constant type safety, ensuring that the structure is always consistent and delivers the expected results.
@@ -281,56 +363,6 @@ As a JSON structure, `SceneMetadata` would look like the following:
 ```
 
 This object uses the `Space` schema from earlier, and also adds another `Vector2` to determine the canvas size. This information allows for object detection to be performed accurately, as it tells us exactly where all relevant points are; thanks to the current image generation pipeline, this information will stay constant across the generated and source images.
-
-### Depth Mapping
-
-Depth map projection is a graphical rendering technique that enhances the perception of depth in 3D environments. This process is often performed by estimation (using a tool such as MiDAS). However, since we have direct access to all vertices of any given 3D model, we can precisely measure distance from the camera - this enables the AI model to 'see' how far away things are accurately.
-
-This process involves two key components: the `Vertex` and `Fragment` shaders, the functionality of which will now be explained below.
-
-#### Vertex Shader
-
-A vertex shader is tasked with the transformation of each vertex's position on the 3D model to a 2D coordinate. When the depth shader is toggled, this process is carried out by the GPU whenever the depth shader is toggled, and also upon movement of the camera thereafter.
-
-```glsl
-varying vec2 vUv;
-
-void main() {
-  vUv = uv;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-```
-
-The above GLSL code assigns texture coordinates to variable `vUv` and calculates the position of each vertex in clip space by multiplying the vertex position with the "model-view" and "projection" matrices.
-
-#### Fragment Shader
-
-A fragment shader is tasked with defining RGBA (red, green, blue & alpha) colours for each pixel being processed - a single fragment shader is called once per pixel. Again, this process is carried out by the GPU whenever the depth shader is toggled, and also upon movement of the camera thereafter.
-
-```glsl
-#include <packing>
-
-varying vec2 vUv;
-uniform sampler2D tDiffuse;
-uniform sampler2D tDepth;
-uniform float cameraNear;
-uniform float cameraFar;
-
-float readDepth(sampler2D depthSampler, vec2 coord) {
-  float fragCoordZ = texture2D(depthSampler, coord).x;
-  float viewZ = perspectiveDepthToViewZ(fragCoordZ, cameraNear, cameraFar);
-  return viewZToOrthographicDepth(viewZ, cameraNear, cameraFar);
-}
-
-void main() {
-  float depth = readDepth(tDepth, vUv);
-
-  gl_FragColor.rgb = 1.0 - vec3(depth);
-  gl_FragColor.a = 1.0;
-}
-```
-
-The above GLSL code reads the depth value from a depth texture (passed through as a uniform from Three.js) for each fragment, converts it from perspective to orthographic depth, and maps this depth to a grayscale color, where closer fragments are lighter than those farther away (which are darker).
 
 ## Image Generation Pipelines
 
